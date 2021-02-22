@@ -66,12 +66,8 @@ class gcam(object):
         return here.ra.deg, here.dec.deg
 
     def listener(self, quitEvent=None, gcamQueue=None):
-        mhsDict = dict(ra_cmd=None, dec_cmd=None,
-                       ra=None, dec=None,
-                       ra_offset=None, dec_offset=None,
-                       alt=None, driveMode=None,
-                       shutter=None)
-
+        """The routine which should read from the queue which the g2can streamer is feeding.
+        """
         # consume items from queue
         try:
             print("consuming on queue...")
@@ -84,12 +80,11 @@ class gcam(object):
                 # self.logger.info(f'from gcam: {changed} {envelope}')
                 self.statusDict.update({k: changed[k] for k in self.statusDict if k in changed})
 
-                self.tracker.update(self.statusDict, changed.copy())
+                self.actor.tracker.update(self.statusDict, changed.copy())
             self.logger.warn('quitEvent on gcam listener...')
 
         except KeyboardInterrupt as e:
             quitEvent.set()
-
 
     def connect(self):
         # setup (use the Gen2 host, user name and password you are advised by
@@ -115,14 +110,10 @@ class gcam(object):
              'FITS.SBR.RA': None,
              'FITS.SBR.DEC': None,
              'STATL.RA_OFFSET': None,
-             'STATL_DEC_OFFSET': None,
+             'STATL.DEC_OFFSET': None,
              'FITS.SBR.ALTITUDE': None,
              'STATL.TELDRIVE': None,
              'STATL.DOMESHUTTER_POS': None,
-             'STATL.LAMP': None,
-             'TSCV.DomeFF_A': None,
-             'TSCV.DomeFF_1B': None,
-             'STATL.CAL.HAL.LAMP1': None,
         }
 
         sc.fetch(d)
@@ -138,7 +129,8 @@ class gcam(object):
         ev_quit = threading.Event()
         self.quitEvent = ev_quit
 
-        self.tracker = sunssTracker.SunssTracker()
+        if not hasattr(self.actor, 'tracker') or self.actor.tracker is None:
+            self.actor.tracker = sunssTracker.SunssTracker()
 
         # start a thread to put status updates on the queue
         t = threading.Thread(target=ss.subscribe_loop, args=[ev_quit, status_q])
@@ -152,34 +144,3 @@ class gcam(object):
         trackerThread.daemon = True
         self.trackerThread = trackerThread
         trackerThread.start()
-
-if __name__ == '__main__':
-
-    # Parse command line options
-    argprs = argparse.ArgumentParser()
-
-    argprs.add_argument("--streamhost", dest="streamhost", metavar="HOST",
-                        default='localhost',
-                        help="Fetch streaming status from HOST")
-    argprs.add_argument("--streamuser", dest="stream_username", default="none",
-                        metavar="USERNAME",
-                        help="Authenticate using USERNAME")
-    argprs.add_argument("-sp", "--streampass", dest="stream_password",
-                        default="none",
-                        metavar="PASSWORD",
-                        help="Authenticate for streams using PASSWORD")
-    argprs.add_argument("--host", dest="host", metavar="HOST",
-                        default='localhost',
-                        help="Fetch status from HOST")
-    argprs.add_argument("--user", dest="username", default="none",
-                        metavar="USERNAME",
-                        help="Authenticate using USERNAME")
-    argprs.add_argument("-p", "--pass", dest="password", default="none",
-                        metavar="PASSWORD",
-                        help="Authenticate using PASSWORD")
-    (options, args) = argprs.parse_known_args(sys.argv[1:])
-
-    if len(args) != 0:
-        argprs.error("incorrect number of arguments")
-
-    main(options, args)

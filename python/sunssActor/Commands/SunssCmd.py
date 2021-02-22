@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from builtins import object
+from importlib import reload
 import numpy as np
 
 import time
@@ -12,6 +12,8 @@ from astropy.coordinates import SkyCoord
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
 from opscore.utility.qstr import qstr
+
+from ics.sunssActor import sunssTracker
 
 class SunssCmd(object):
 
@@ -29,6 +31,8 @@ class SunssCmd(object):
             ('status', '', self.status),
             ('stop', '', self.stop),
             ('track', '<ra> <dec> [<speed>]', self.track),
+            ('startExposures', '', self.startExposures),
+            ('reloadTracker', '', self.reloadTracker),
         ]
         # Define typed command arguments for the above commands.
         self.keys = keys.KeysDictionary("sunss", (1, 1),
@@ -53,6 +57,20 @@ class SunssCmd(object):
 
         ret = self.pi.sunssCmd(cmd_txt, cmd=cmd)
         cmd.finish('text=%s' % (qstr('returned: %s' % (ret))))
+
+    def reloadTracker(self, cmd):
+        """ Reload the SuNSS tracking logic module """
+
+        reload(sunssTracker)
+        newTracker = sunssTracker.SunssTracker()
+        self.actor.tracker = newTracker
+
+        cmd.finish()
+
+    def startExposures(self, cmd):
+        """ Start SPS exposures, without starting tracking. """
+
+        cmd.fail('text="Not implemented yet"')
 
     def status(self, cmd, doFinish=True):
         """ Report status keys. """
