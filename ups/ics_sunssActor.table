@@ -3,3 +3,5 @@ setupRequired(pfs_utils)
 
 pathPrepend(PATH, ${PRODUCT_DIR}/bin)
 pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)
+
+pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/g2cam)
