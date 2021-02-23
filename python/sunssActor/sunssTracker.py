@@ -19,12 +19,10 @@ def sunIsDown():
     return sunaltaz.alt.value < -2
 
 class SunssStrategy:
-    def __init__(self):
-        self.ra_cmd = None
-        self.dec_cmd = None
-        self.shutterOpen = 'unknown'
-        self.driveMode = None
-        self.sunssState = 'stopped'
+    def __init__(self, ra_cmd=None, dec_cmd=None, sunssState='stopped'):
+        self.ra_cmd = ra_cmd
+        self.dec_cmd = dec_cmd
+        self.sunssState = sunssState
 
     def sunssIsRunning(self):
         return self.sunssState != 'stopped'
@@ -52,8 +50,8 @@ class SunssStrategy:
         raise NotImplementedError("update must be implemented in subclass")
 
 class UntrackedStrategy(SunssStrategy):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def update(self, newState):
         """Implement the most trivial observing strategy, which simply observes without tracking.
@@ -83,6 +81,8 @@ class UntrackedStrategy(SunssStrategy):
         return ''
 
 class GuidingStrategy(SunssStrategy):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def update(self, newState):
         """Implement an observing strategy for programs where we expect to guide
@@ -127,11 +127,26 @@ class GuidingStrategy(SunssStrategy):
             return self.startSunss(newState, doTrack=True)
 
 class SunssTracker:
+    strategies = dict(untracked=UntrackedStrategy,
+                      guiding=GuidingStrategy)
+
     def __init__(self):
         self.in_q = queue.Queue()
         self.logger = logging.getLogger('logic')
 
-        self.strategy = UntrackedStrategy()
+        self.strategy = self.resolveStrategy()
+
+    def resolveStrategy(self, name=None):
+        """Wire in the named observing strategy. """
+
+        if name is None or name == 'default':
+            name = 'untracked'
+        try:
+            strategy = self.strategies.get(name, None)
+        except KeyError:
+            raise KeyError(f'unknown observing strategy {name}')
+
+        return strategy()
 
     def logfileName(self, unit):
         return f'{unit}_{time.strftime("%Y-%m-%d")}.log'

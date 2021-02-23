@@ -31,6 +31,8 @@ class SunssCmd(object):
             ('status', '', self.status),
             ('stop', '', self.stop),
             ('track', '<ra> <dec> [<speed>]', self.track),
+            ('enable', '[<strategy>]', self.enable),
+            ('disable', '', self.disable),
             ('startExposures', '', self.startExposures),
             ('reloadTracker', '', self.reloadTracker),
         ]
@@ -42,6 +44,8 @@ class SunssCmd(object):
                                                  help='Dec degrees to start tracking from'),
                                         keys.Key("speed", types.Int(), default=1,
                                                  help='Tracking speed multiple to test with'),
+                                        keys.Key("strategy", types.String(),
+                                                 help='How to respond to telescope changes'),
                                         )
 
         self.state = 'stopped'
