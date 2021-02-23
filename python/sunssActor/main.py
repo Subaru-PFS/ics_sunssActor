@@ -33,7 +33,7 @@ class OurActor(actorcore.ICC.ICC):
             self.attachAllControllers()
             self.everConnected = True
 
-            _needModels = [self.name, 'gen2']
+            _needModels = [self.name, 'sps', 'iic']
             self.logger.info(f'adding models: {_needModels}')
             self.addModels(_needModels)
             self.logger.info(f'added models: {self.models.keys()}')
@@ -62,7 +62,18 @@ class OurActor(actorcore.ICC.ICC):
             self.statusLoopCB(controller)
         else:
             cmd.warn('text="adjusted %s loop to %gs"' % (controller, self.monitors[controller]))
-            
+
+    def safeCall(self, cmd, actor, cmdStr, timeLim=60):
+        cmdVar = self.cmdr.call(actor=actor, cmdStr=cmdStr, timeLim=timeLim, forUserCmd=cmd)
+
+        if cmdVar.didFail:
+            reply = cmdVar.replyList[-1]
+            repStr = reply.keywords.canonical(delimiter=';')
+            cmdHead = cmdStr.split(" ", 1)[0]
+            cmd.warn(repStr.replace('command failed', f'{actor} {cmdHead} failed'))
+
+        return cmdVar
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', default=None, type=str, nargs='?',

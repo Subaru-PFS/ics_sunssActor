@@ -44,7 +44,7 @@ class SunssCmd(object):
                                                  help='Tracking speed multiple to test with'),
                                         )
 
-        self.state = None
+        self.state = 'stopped'
 
     @property
     def pi(self):
@@ -67,13 +67,10 @@ class SunssCmd(object):
 
         cmd.finish()
 
-    def startExposures(self, cmd):
-        """ Start SPS exposures, without starting tracking. """
-
-        cmd.fail('text="Not implemented yet"')
-
     def status(self, cmd, doFinish=True):
         """ Report status keys. """
+
+        self.actor.sendVersionKey(cmd)
 
         ret = self.pi.sunssCmd('status', cmd=cmd)
         ret = ret.split()
@@ -94,14 +91,14 @@ class SunssCmd(object):
     def _getSunssSm(self, cmd):
         """Figure out which SM, if any, is connectedb to SuNSS. """
 
-        iicModel = self.actor.models['iic'].keyVarDict
+        spsModel = self.actor.models['sps'].keyVarDict
         sm = None
         for i in range(1,5):
-            ls =  iicModel[f'sm{i}lightSource'].values[0]
+            ls =  spsModel[f'sm{i}LightSource'].valueList[0]
             if ls == 'sunss':
-                sm = f'sm{i}'
+                sm = i
                 break
-        self.logger.inform(f'found SuNSS on SM {sm}')
+        self.actor.logger.info(f'found SuNSS on SM {sm}')
 
         return sm
 
@@ -112,15 +109,58 @@ class SunssCmd(object):
         if sunssSm is None:
             return None, None
 
-    def iccStart(self, cmd, exptime=1200.0):
-        """Start a new SPS exposure if we can."""
+    def startExposures(self, cmd, doFinish=True):
+        """ Start SPS exposures, without starting tracking. """
 
-        pass
+        sm = self._getSunssSm(cmd)
+        if sm is None:
+            cmd.fail('text="SuNSS is not connected to a SM"')
+            return
+
+        if self.state == 'integrating':
+            cmd.fail('text="SPS is already integrating"')
+            return
+
+        # Temporarily (until INSTRM-xxxx changes startExposures to return after validation
+        # and resource allocation), make command timeout quickly and ignore timeLim failures.
+        ret = self.actor.safeCall(cmd, 'iic',
+                                  f'sps startExposures exptime=1200 sm={sm} name=cpl',
+                                  timeLim=5)
+        if ret.didFail:
+            if 'Timeout' not in ret.replyList[-1].keywords:
+                raise RuntimeError(f'failed to start sps exposures: {ret}')
+
+        self.state = 'integrating'
+        if doFinish:
+            cmd.finish()
+
+    def takeFlats(self, cmd):
+        """ Start a set of SuNSS flats. """
+
+        cmd.fail('text="Not implemented yet"')
+
+    def enable(self, cmd):
+        """ Enable gcam logic. """
+
+        cmdKeys = cmd.cmd.keywords
+        strategy = cmdKeys['strategy'].values[0] if 'strategy' in cmdKeys else 'default'
+
+        cmd.fail('text="Not implemented yet"')
+
+    def disable(self, cmd):
+        """ Disable gcam logic. """
+
+        cmd.fail('text="Not implemented yet"')
 
     def stop(self, cmd):
         """ Stop any current move and exposure. """
 
-        ret = self.pi.sunssCmd('stop', cmd=cmd)
+        if self.state is 'tracking':
+            ret = self.pi.sunssCmd('stop', cmd=cmd)
+        if self.state != 'stopped':
+            ret = self.actor.safeCall(cmd, 'iic',
+                                      f'sps finishExposure',
+                                      timeLim=5)
         self.state = 'stopped'
         self.status(cmd)
 
@@ -148,4 +188,5 @@ class SunssCmd(object):
 
         cmd.inform(f'text="track ra,dec={ra},{dec} to ha,dec,time={ha},{dec},{time0}"')
         ret = self.pi.sunssCmd(f'track {ha} {dec} {time0} {speed}', cmd=cmd)
-        self.status(cmd)
+        self.startExposures(cmd)
+        self.state = 'tracking'
