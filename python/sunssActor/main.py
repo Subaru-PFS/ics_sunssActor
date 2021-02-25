@@ -6,6 +6,8 @@ from twisted.internet import reactor
 
 import actorcore.ICC
 
+from ics.sunssActor import sunssTracker
+
 class OurActor(actorcore.ICC.ICC):
     def __init__(self, name, productName=None, configFile=None, site=None,
                  logLevel=logging.INFO):
@@ -21,6 +23,8 @@ class OurActor(actorcore.ICC.ICC):
 
         self.monitors = dict()
         self.statusLoopCB = self.statusLoop
+
+        self.tracker = sunssTracker.SunssTracker(self)
 
     def reloadConfiguration(self, cmd):
         cmd.inform('sections=%08x,%r' % (id(self.config),
@@ -64,6 +68,9 @@ class OurActor(actorcore.ICC.ICC):
             cmd.warn('text="adjusted %s loop to %gs"' % (controller, self.monitors[controller]))
 
     def safeCall(self, cmd, actor, cmdStr, timeLim=60):
+        """Very mildly wrap MHS synchronous call. """
+
+        cmd.inform(f'text="calling {actor} with {cmdStr}"')
         cmdVar = self.cmdr.call(actor=actor, cmdStr=cmdStr, timeLim=timeLim, forUserCmd=cmd)
 
         if cmdVar.didFail:

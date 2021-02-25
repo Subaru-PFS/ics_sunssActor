@@ -49,6 +49,10 @@ class SunssStrategy:
     def update(self, newState):
         raise NotImplementedError("update must be implemented in subclass")
 
+class IdleStrategy(SunssStrategy):
+    def update(self, newState):
+        pass
+
 class UntrackedStrategy(SunssStrategy):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -128,13 +132,15 @@ class GuidingStrategy(SunssStrategy):
 
 class SunssTracker:
     strategies = dict(untracked=UntrackedStrategy,
+                      idle=IdleStrategy,
                       guiding=GuidingStrategy)
 
-    def __init__(self):
+    def __init__(self, actor):
+        self.actor = actor
         self.in_q = queue.Queue()
         self.logger = logging.getLogger('logic')
 
-        self.strategy = self.resolveStrategy()
+        self.resolveStrategy()
 
     def resolveStrategy(self, name=None):
         """Wire in the named observing strategy. """
@@ -146,14 +152,16 @@ class SunssTracker:
         except KeyError:
             raise KeyError(f'unknown observing strategy {name}')
 
-        return strategy()
+        self.strategy = strategy()
+        self.strategyName = name
 
     def logfileName(self, unit):
         return f'{unit}_{time.strftime("%Y-%m-%d")}.log'
 
     def takeAction(self, cmd, action):
         with open(self.logfileName('action'), mode='at') as actFile:
-            actFile.write(cmd + '\n')
+            print(cmd, file=actFile)
+            self.actor.callCommand(action)
 
     def logAction(self, msg):
         with open(self.logfileName('all'), mode='at') as logfile:
