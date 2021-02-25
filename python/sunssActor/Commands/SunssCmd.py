@@ -155,8 +155,7 @@ class SunssCmd(object):
                 raise RuntimeError(f'failed to start sps exposures: {ret}')
 
         self.state = 'integrating'
-        if doFinish:
-            cmd.finish()
+        self.status(cmd, doFinish=doFinish)
 
     def takeFlats(self, cmd):
         """ Start a set of SuNSS flats. """
