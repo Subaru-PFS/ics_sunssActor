@@ -71,7 +71,7 @@ class OurActor(actorcore.ICC.ICC):
         """Very mildly wrap MHS synchronous call. """
 
         cmd.inform(f'text="calling {actor} with {cmdStr}"')
-        cmdVar = self.cmdr.call(actor=actor, cmdStr=cmdStr, timeLim=timeLim, forUserCmd=cmd)
+        cmdVar = self.cmdr.call(actor=actor, cmdStr=cmdStr, timeLim=timeLim) #, forUserCmd=cmd)
 
         if cmdVar.didFail:
             reply = cmdVar.replyList[-1]
