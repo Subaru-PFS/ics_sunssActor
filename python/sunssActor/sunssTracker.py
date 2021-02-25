@@ -161,7 +161,7 @@ class SunssTracker:
     def takeAction(self, cmd, action):
         with open(self.logfileName('action'), mode='at') as actFile:
             print(cmd, file=actFile)
-            self.actor.callCommand(action)
+        self.actor.callCommand(action)
 
     def logAction(self, msg):
         with open(self.logfileName('all'), mode='at') as logfile:
