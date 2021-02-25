@@ -45,6 +45,7 @@ class gcam(object):
         self.logger = logging.getLogger(self.name)
         self.logger.setLevel(loglevel)
 
+        self.kwlog = open(self._logname('/data/logs/gen2/kw'), 'w+t')
         self.connect()
 
     def __del__(self):
@@ -52,18 +53,29 @@ class gcam(object):
         self.quitEvent.set()
 
     def start(self, cmd=None):
-        cmd.warn(f'text="start thread_count={threading.active_count()}"')
+        if cmd is not None:
+            cmd.warn(f'text="start thread_count={threading.active_count()}"')
 
     def stop(self, cmd=None):
-        cmd.warn(f'text="stopping thread_count={threading.active_count()}"')
+        if cmd is not None:
+            cmd.warn(f'text="stopping thread_count={threading.active_count()}"')
         self.quitEvent.set()
         time.sleep(1)
-        cmd.warn(f'text="stopped thread_count={threading.active_count()}"')
+        if cmd is not None:
+            cmd.warn(f'text="stopped thread_count={threading.active_count()}"')
 
     def _convertRaDecToDegrees(self, raStr, decStr):
         here = coords.FK5(ra=coords.Angle(raStr, unit='hourangle'),
                           dec=coords.Angle(decStr, unit='deg'))
         return here.ra.deg, here.dec.deg
+
+    def _logname(self, name):
+        return time.strftime(f'{name}_%Y-%m-%dT%H:%M:%S.log')
+
+    def _ts(self):
+        now = time.time()
+        tup = time.localtime(now)
+        return time.strftime(f'%Y-%m-%dT%H:%M:%S.{int((now - int(now))*10000):04d}', tup)
 
     def listener(self, quitEvent=None, gcamQueue=None):
         """The routine which should read from the queue which the g2can streamer is feeding.
@@ -77,7 +89,17 @@ class gcam(object):
                 except queue.Empty:
                     continue
                 changed = envelope['status']
-                # self.logger.info(f'from gcam: {changed} {envelope}')
+                try:
+                    kwdict = changed.copy()
+                    for n in 'STATUS.MLP2_L2', 'STATUS.MLP2_L3A':
+                        try:
+                            del kwdict[n]
+                        except NameError:
+                            pass
+                    print(f'{self._ts()} {kwdict}', file=self.kwlog, flush=True)
+                except:
+                    pass
+
                 self.statusDict.update({k: changed[k] for k in self.statusDict if k in changed})
 
                 self.actor.tracker.update(self.statusDict, changed.copy())
@@ -130,7 +152,7 @@ class gcam(object):
         self.quitEvent = ev_quit
 
         if not hasattr(self.actor, 'tracker') or self.actor.tracker is None:
-            self.actor.tracker = sunssTracker.SunssTracker()
+            self.actor.tracker = sunssTracker.SunssTracker(self.actor)
 
         # start a thread to put status updates on the queue
         t = threading.Thread(target=ss.subscribe_loop, args=[ev_quit, status_q])
