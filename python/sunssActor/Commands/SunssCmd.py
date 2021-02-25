@@ -14,6 +14,7 @@ import opscore.protocols.types as types
 from opscore.utility.qstr import qstr
 
 from ics.sunssActor import sunssTracker
+reload(sunssTracker)
 
 class SunssCmd(object):
 
@@ -27,13 +28,16 @@ class SunssCmd(object):
         # passed a single argument, the parsed and typed command.
         #
         self.vocab = [
-            ('sunss', '@raw', self.sunssRaw),
+            ('pi', '@raw', self.sunssRaw),
+            ('pi', 'move <degrees>', self.move),
+            ('pi', 'move <steps>', self.move),
             ('status', '', self.status),
             ('stop', '', self.stop),
             ('track', '<ra> <dec> [<speed>]', self.track),
             ('enable', '[<strategy>]', self.enable),
             ('disable', '', self.disable),
             ('startExposures', '', self.startExposures),
+            ('takeFlats', '', self.takeFlats),
             ('reloadTracker', '', self.reloadTracker),
         ]
         # Define typed command arguments for the above commands.
@@ -42,6 +46,10 @@ class SunssCmd(object):
                                                  help='RA degrees to start tracking from'),
                                         keys.Key("dec", types.Float(),
                                                  help='Dec degrees to start tracking from'),
+                                        keys.Key("degrees", types.Float(),
+                                                 help='Degrees to move frm current position'),
+                                        keys.Key("steps", types.Int(),
+                                                 help='Steps to move frm current position'),
                                         keys.Key("speed", types.Int(), default=1,
                                                  help='Tracking speed multiple to test with'),
                                         keys.Key("strategy", types.String(),
@@ -49,6 +57,7 @@ class SunssCmd(object):
                                         )
 
         self.state = 'stopped'
+        self.connected = False
 
     @property
     def pi(self):
@@ -62,11 +71,24 @@ class SunssCmd(object):
         ret = self.pi.sunssCmd(cmd_txt, cmd=cmd)
         cmd.finish('text=%s' % (qstr('returned: %s' % (ret))))
 
+    def move(self, cmd):
+        """ Rotate SuNSS imager by steps or degrees """
+
+        cmdKeys = cmd.cmd.keywords
+        if 'steps' in cmdKeys:
+            steps = cmdKeys['steps'].values[0]
+        elif 'degrees' in cmdKeys:
+            degrees = cmdKeys['degrees'].values[0]
+            steps = degrees*8.88889
+
+        ret = self.pi.sunssCmd(f'runit {int(steps)}', timelim=10.0, cmd=cmd)
+        self.status(cmd)
+
     def reloadTracker(self, cmd):
         """ Reload the SuNSS tracking logic module """
 
         reload(sunssTracker)
-        newTracker = sunssTracker.SunssTracker()
+        newTracker = sunssTracker.SunssTracker(self.actor)
         self.actor.tracker = newTracker
 
         cmd.finish()
@@ -74,7 +96,9 @@ class SunssCmd(object):
     def status(self, cmd, doFinish=True):
         """ Report status keys. """
 
-        self.actor.sendVersionKey(cmd)
+        if not self.connected:
+            self.actor.sendVersionKey(cmd)
+            self.connected = True
 
         ret = self.pi.sunssCmd('status', cmd=cmd)
         ret = ret.split()
@@ -90,6 +114,7 @@ class SunssCmd(object):
             steps = -1
             moving = 0
 
+        cmd.inform(f'sunssState={self.state}; sunssStrategy={self.actor.tracker.strategyName}')
         cmd.finish('sunssRunning=%d,%d,%d,%d' % (tracking, moving, stepTs, steps))
 
     def _getSunssSm(self, cmd):
@@ -106,14 +131,7 @@ class SunssCmd(object):
 
         return sm
 
-    def iicStatus(self, cmd):
-        """Figure out what iic can or is doing on our behalf. """
-
-        sunssSm = self._getSunssSm(cmd)
-        if sunssSm is None:
-            return None, None
-
-    def startExposures(self, cmd, doFinish=True):
+    def startExposures(self, cmd, tracking=False, doFinish=True):
         """ Start SPS exposures, without starting tracking. """
 
         sm = self._getSunssSm(cmd)
@@ -125,10 +143,12 @@ class SunssCmd(object):
             cmd.fail('text="SPS is already integrating"')
             return
 
+        name = f'sunss_{"tracking" if tracking else "untracked"}'
+
         # Temporarily (until INSTRM-xxxx changes startExposures to return after validation
         # and resource allocation), make command timeout quickly and ignore timeLim failures.
         ret = self.actor.safeCall(cmd, 'iic',
-                                  f'sps startExposures exptime=1200 sm={sm} name=cpl',
+                                  f'sps startExposures exptime=1200 sm={sm} name={name}',
                                   timeLim=5)
         if ret.didFail:
             if 'Timeout' not in ret.replyList[-1].keywords:
@@ -159,12 +179,13 @@ class SunssCmd(object):
     def stop(self, cmd):
         """ Stop any current move and exposure. """
 
-        if self.state is 'tracking':
-            ret = self.pi.sunssCmd('stop', cmd=cmd)
         if self.state != 'stopped':
             ret = self.actor.safeCall(cmd, 'iic',
                                       f'sps finishExposure',
                                       timeLim=5)
+        if self.state is 'tracking':
+            ret = self.pi.sunssCmd('stop', timelim=6.0, cmd=cmd)
+
         self.state = 'stopped'
         self.status(cmd)
 
@@ -191,6 +212,6 @@ class SunssCmd(object):
         ha, time0 = self._raToHa(ra)
 
         cmd.inform(f'text="track ra,dec={ra},{dec} to ha,dec,time={ha},{dec},{time0}"')
-        ret = self.pi.sunssCmd(f'track {ha} {dec} {time0} {speed}', cmd=cmd)
-        self.startExposures(cmd)
+        ret = self.pi.sunssCmd(f'track {ha} {dec} {time0} {speed}', timelim=15, cmd=cmd)
+        self.startExposures(cmd, tracking=True)
         self.state = 'tracking'
