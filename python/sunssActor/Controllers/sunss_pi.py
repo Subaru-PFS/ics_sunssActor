@@ -29,11 +29,11 @@ class DeviceIO(object):
         self.device = None if keepOpen else False
         self.EOL = EOL
 
-    def connect(self, cmd=None, timeout=1.0):
+    def connect(self, cmd=None, timelim=1.0):
         if self.device:
             return self.device
         
-        s = self._connect(cmd=cmd, timeout=timeout)
+        s = self._connect(cmd=cmd, timelim=timelim)
 
         if self.device is None:
             self.device = s
@@ -59,10 +59,10 @@ class SocketIO(DeviceIO):
 
         self.ioBuffer = bufferedSocket.BufferedSocket('tempsio')
         
-    def _connect(self, cmd=None, timeout=1.0):
+    def _connect(self, cmd=None, timelim=1.0):
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(timeout)
+            s.settimeout(timelim)
         except Exception as e:
             if cmd is not None:
                 cmd.warn('text="failed to create socket: %s"' % (e))
@@ -77,17 +77,17 @@ class SocketIO(DeviceIO):
 
         return s
 
-    def readOneLine(self, sock=None, timeout=1.0, cmd=None):
+    def readOneLine(self, sock=None, timelim=1.0, cmd=None):
         if sock is None:
             sock = self.connect(cmd=cmd)
             
-        ret = self.ioBuffer.getOneResponse(sock, timeout=timeout, cmd=cmd)
+        ret = self.ioBuffer.getOneResponse(sock, timeout=timelim, cmd=cmd)
         
         sock.close()
         
         return ret
 
-    def sendOneCommand(self, cmdStr, sock=None, cmd=None):
+    def sendOneCommand(self, cmdStr, timelim=1.0, sock=None, cmd=None):
         if cmd is None:
             cmd = self.actor.bcast
 
@@ -107,7 +107,7 @@ class SocketIO(DeviceIO):
             cmd.warn('text="failed to create send command to %s: %s"' % (self.name, e))
             raise
 
-        ret = self.readOneLine(sock=sock, cmd=cmd)
+        ret = self.readOneLine(timelim=timelim, sock=sock, cmd=cmd)
 
         self.logger.debug('received %r', ret)
         cmd.diag('text="received %r"' % ret)
@@ -138,10 +138,11 @@ class sunss_pi(object):
     def stop(self, cmd=None):
         pass
 
-    def sunssCmd(self, cmdStr, cmd=None):
+    def sunssCmd(self, cmdStr, timelim=1.0, cmd=None):
         if cmd is None:
             cmd = self.actor.bcast
 
-        ret = self.dev.sendOneCommand(cmdStr, cmd=cmd)
+        cmd.inform(f'text="sending to sunss: {cmdStr}"')
+        ret = self.dev.sendOneCommand(cmdStr, timelim=timelim, cmd=cmd)
         return ret
 
