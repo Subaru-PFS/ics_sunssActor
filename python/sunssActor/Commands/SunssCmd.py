@@ -33,7 +33,7 @@ class SunssCmd(object):
             ('pi', 'move <steps>', self.move),
             ('status', '', self.status),
             ('stop', '', self.stop),
-            ('track', '<ra> <dec> [<speed>]', self.track),
+            ('track', '<ra> <dec> [@noExp] [<speed>] [<exptime>]', self.track),
             ('enable', '[<strategy>]', self.enable),
             ('disable', '', self.disable),
             ('startExposures', '', self.startExposures),
@@ -46,6 +46,8 @@ class SunssCmd(object):
                                                  help='RA degrees to start tracking from'),
                                         keys.Key("dec", types.Float(),
                                                  help='Dec degrees to start tracking from'),
+                                        keys.Key("exptime", types.Float(),
+                                                 help='Exposure time'),
                                         keys.Key("degrees", types.Float(),
                                                  help='Degrees to move frm current position'),
                                         keys.Key("steps", types.Int(),
@@ -131,7 +133,7 @@ class SunssCmd(object):
 
         return sm
 
-    def startExposures(self, cmd, tracking=False, doFinish=True):
+    def startExposures(self, cmd, tracking=False, doFinish=True, exptime=1200.0):
         """ Start SPS exposures, without starting tracking. """
 
         sm = self._getSunssSm(cmd)
@@ -148,7 +150,7 @@ class SunssCmd(object):
         # Temporarily (until INSTRM-xxxx changes startExposures to return after validation
         # and resource allocation), make command timeout quickly and ignore timeLim failures.
         ret = self.actor.safeCall(cmd, 'iic',
-                                  f'sps startExposures exptime=1200 sm={sm} name={name}',
+                                  f'sps startExposures exptime={exptime} sm={sm} name={name}',
                                   timeLim=5)
         if ret.didFail:
             if 'Timeout' not in ret.replyList[-1].keywords:
@@ -163,17 +165,19 @@ class SunssCmd(object):
         cmd.fail('text="Not implemented yet"')
 
     def enable(self, cmd):
-        """ Enable gcam logic. """
+        """ Enable logic on Gen2 keywords """
 
         cmdKeys = cmd.cmd.keywords
         strategy = cmdKeys['strategy'].values[0] if 'strategy' in cmdKeys else 'default'
 
-        cmd.fail('text="Not implemented yet"')
+        self.actor.tracker.resolveStrategy(strategy)
+        self.status(cmd)
 
     def disable(self, cmd):
-        """ Disable gcam logic. """
+        """ Disable any actions based on Gen2 keywords. """
 
-        cmd.fail('text="Not implemented yet"')
+        self.actor.tracker.resolveStrategy('idle')
+        self.status(cmd)
 
     def stop(self, cmd):
         """ Stop any current move and exposure. """
@@ -207,10 +211,15 @@ class SunssCmd(object):
         cmdKeys = cmd.cmd.keywords
         ra = cmdKeys['ra'].values[0]
         dec = cmdKeys['dec'].values[0]
+        dec = cmdKeys['dec'].values[0]
+        noExp = 'noExp' in cmdKeys
         speed = 1 if 'speed' not in cmdKeys else cmdKeys['speed'].values[0]
+        exptime = 1200.0 if 'exptime' not in cmdKeys else cmdKeys['exptime'].values[0]
         ha, time0 = self._raToHa(ra)
 
         cmd.inform(f'text="track ra,dec={ra},{dec} to ha,dec,time={ha},{dec},{time0}"')
         ret = self.pi.sunssCmd(f'track {ha} {dec} {time0} {speed}', timelim=15, cmd=cmd)
-        self.startExposures(cmd, tracking=True)
+
+        if not noExp:
+            self.startExposures(cmd, tracking=True, exptime=exptime)
         self.state = 'tracking'

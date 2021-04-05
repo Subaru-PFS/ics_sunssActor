@@ -50,8 +50,10 @@ class SunssStrategy:
         raise NotImplementedError("update must be implemented in subclass")
 
 class IdleStrategy(SunssStrategy):
+    """Do nothing. """
+
     def update(self, newState):
-        pass
+        return ''
 
 class UntrackedStrategy(SunssStrategy):
     def __init__(self, **kwargs):
