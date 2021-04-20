@@ -33,7 +33,7 @@ class SunssCmd(object):
             ('pi', 'move <steps>', self.move),
             ('status', '', self.status),
             ('stop', '', self.stop),
-            ('track', '<ra> <dec> [@noExp] [<speed>] [<exptime>]', self.track),
+            ('track', '<ra> <dec> [<speed>] [<exptime>]', self.track),
             ('enable', '[<strategy>]', self.enable),
             ('disable', '', self.disable),
             ('startExposures', '', self.startExposures),
@@ -211,8 +211,6 @@ class SunssCmd(object):
         cmdKeys = cmd.cmd.keywords
         ra = cmdKeys['ra'].values[0]
         dec = cmdKeys['dec'].values[0]
-        dec = cmdKeys['dec'].values[0]
-        noExp = 'noExp' in cmdKeys
         speed = 1 if 'speed' not in cmdKeys else cmdKeys['speed'].values[0]
         exptime = 1200.0 if 'exptime' not in cmdKeys else cmdKeys['exptime'].values[0]
         ha, time0 = self._raToHa(ra)
@@ -220,6 +218,6 @@ class SunssCmd(object):
         cmd.inform(f'text="track ra,dec={ra},{dec} to ha,dec,time={ha},{dec},{time0}"')
         ret = self.pi.sunssCmd(f'track {ha} {dec} {time0} {speed}', timelim=15, cmd=cmd)
 
-        if not noExp:
+        if exptime > 0:
             self.startExposures(cmd, tracking=True, exptime=exptime)
         self.state = 'tracking'
