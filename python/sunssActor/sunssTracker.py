@@ -94,30 +94,27 @@ class GuidingStrategy(SunssStrategy):
         """Implement an observing strategy for programs where we expect to guide
 
         Whenever we start Guiding, start SuNSS tracking an SPS exposures.
-        Whenever we stop guiding, stop both.
+        Whenever we slew or stop tracking the sky, stop both.
 
         This is a disaster if the fields are short and/or the observer does not guide.
         """
 
-        raise NotImplementedError()
-
-        ret = ''
-
-
         if self.sunssIsRunning():
-            # Stop SuNSS if we close or switch to alt-az tracking mode.
+            # Stop SuNSS if we close or switch to alt-az tracking
+            # mode.  We *ignore* Unknown mode: that seems to be an
+            # artifact when switching modes.  We allow switching
+            # between Guiding and Tracking, but we need to stop when
+            # the commanded position differs from the current position
+            # by some fraction of a fiber diameter. A number of
+            # instruments (e.g. HSC and FOCAS) do this (switch to
+            # Tracking and move locally) a fair amount.
+            #
             if newState['shutter'] != 'OPEN':
                 return self.stopSunss()
-            if newState['driveMode'] == 'Pointing':
+            if newState['driveMode'] in {'Slewing', 'Pointing'}:
                 return self.stopSunss()
 
-            # Some observing sequences (seen with FOCAS and HSC)
-            # briefly drop out of Guiding to make small
-            # adjustments. We should allow this, but check whether we
-            # have moved too far.
-            # Use ra_cmd.
-
-            raise NotImplementedError()
+            return ''
 
         else:
             # Do not start if dome is closed or we are not now Guiding

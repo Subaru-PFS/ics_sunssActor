@@ -26,6 +26,7 @@ import threading
 import time
 import queue
 import logging
+import pathlib
 
 import astropy.coordinates as coords
 
@@ -35,6 +36,19 @@ from g2cam.status.stream import StatusStream
 from ics.sunssActor import sunssTracker
 
 reload(sunssTracker)
+
+class LogRotator:
+    def __init__(self, logDir, baseName):
+        self.logDir = logDir
+        self.baseName = baseName
+        self.logName = None
+        self.logFile = None
+
+    def _logname(self, name):
+        return time.strftime(f'{name}_%Y-%m-%dT%H:%M:%S.log')
+
+    def log(self, msg):
+        pass
 
 class gcam(object):
     def __init__(self, actor, name,
