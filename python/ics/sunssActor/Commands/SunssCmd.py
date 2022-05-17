@@ -184,7 +184,7 @@ class SunssCmd(object):
 
         if self.state != 'stopped':
             ret = self.actor.safeCall(cmd, 'iic',
-                                      f'sps finishExposure',
+                                      f'sps finishExposure now',
                                       timeLim=5)
         if self.state is 'tracking':
             ret = self.pi.sunssCmd('stop', timelim=6.0, cmd=cmd)
