@@ -150,7 +150,7 @@ class SunssCmd(object):
         # Temporarily (until INSTRM-xxxx changes startExposures to return after validation
         # and resource allocation), make command timeout quickly and ignore timeLim failures.
         ret = self.actor.safeCall(cmd, 'iic',
-                                  f'sps startExposures exptime={exptime} sm={sm} name={name}',
+                                  f'sps startExposures exptime={exptime} specNum={sm} name={name}',
                                   timeLim=5)
         if ret.didFail:
             if 'Timeout' not in ret.replyList[-1].keywords:
