@@ -52,7 +52,7 @@ class LogRotator:
 
 class gcam(object):
     def __init__(self, actor, name,
-                 loglevel=logging.DEBUG):
+                 loglevel=logging.INFO):
 
         self.name = name
         self.actor = actor
@@ -96,7 +96,7 @@ class gcam(object):
         """
         # consume items from queue
         try:
-            print("consuming on queue...")
+            self.logger.info("consuming on queue...")
             while not quitEvent.is_set():
                 try:
                     envelope = gcamQueue.get(timeout=0.5)
@@ -156,7 +156,7 @@ class gcam(object):
         self.statusDict = d
 
         ss = StatusStream(host=options.streamhost, username=options.stream_username,
-                          password=options.stream_password)
+                          password=options.stream_password, logger=self.logger)
         ss.connect()
 
         # create a queue to receive the status updates

@@ -42,7 +42,7 @@ class SunssStrategy:
 
         self.sunssState = 'tracking' if doTrack else 'running'
         if doTrack:
-            return f'track ra={newState.ra_cmd} dec={newState.dec_cmd}'
+            return f'track ra={self.ra_cmd} dec={self.dec_cmd}'
         else:
             return 'startExposures'
 
@@ -69,14 +69,14 @@ class UntrackedStrategy(SunssStrategy):
             # Stop SuNSS if we close or switch to alt-az tracking mode.
             if newState['shutter'] != 'OPEN':
                 return self.stopSunss()
-            if newState['driveMode'] == 'Pointing':
+            if newState['driveMode'] not in {'Guiding', 'Tracking', 'Unknown'}:
                 return self.stopSunss()
             # We do not care if we move on the sky.
         else:
             # Do not start if dome is closed or we are in alt-az mode;
             if newState['shutter'] != 'OPEN':
                 return ''
-            if newState['driveMode'] == 'Pointing':
+            if newState['driveMode'] not in {'Guiding', 'Tracking'}:
                 return ''
 
             # The shutters do get opened during the day.
@@ -111,16 +111,18 @@ class GuidingStrategy(SunssStrategy):
             #
             if newState['shutter'] != 'OPEN':
                 return self.stopSunss()
-            if newState['driveMode'] in {'Slewing', 'Pointing'}:
+            if newState['driveMode'] not in {'Guiding', 'Tracking', 'Unknown'}:
                 return self.stopSunss()
 
+            # Do need to add a test against the boresight changing "significantly" -- CPL
+            
             return ''
 
         else:
-            # Do not start if dome is closed or we are not now Guiding
+            # Do not start if dome is closed or we are not now Guiding/Tracking the sky
             if newState['shutter'] != 'OPEN':
                 return ''
-            if newState['driveMode'] != 'Guiding':
+            if newState['driveMode'] not in {'Guiding', 'Tracking'}:
                 return ''
 
             # The shutters do get opened during the day.
